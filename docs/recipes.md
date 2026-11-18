@@ -76,7 +76,7 @@ takes optional `headers`:
 env:
   env_marker:
     url: /api/health
-    headers: { Authorization: "Bearer ${E2E_TOKEN}" }
+    headers: { Authorization: 'Bearer ${E2E_TOKEN}' }
     expect_json: { env: staging }
 ```
 

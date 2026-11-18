@@ -13,7 +13,7 @@ critical/exclusive scheduling, and the element gate.
 
 - **Safety first** — refuses to run against production. Before any reset or
   test, the target must return a **JSON environment marker** attesting both the
-  app *and* the live database identity, compared field-by-field.
+  app _and_ the live database identity, compared field-by-field.
 - **Deterministic order** — tests are nodes of a dependency graph
   (reset → seed → flows → teardown), with declared `reads`/`writes` so the
   scheduler never runs two writers of the same resource concurrently.
@@ -72,4 +72,3 @@ story. In short: the app computes its `db` identity from its **live connection**
 `attest` over the same transport; the marker is re-checked on every drift poll.
 Traces and artifacts can contain passwords — see the redaction note in
 `docs/authoring.md`.
-

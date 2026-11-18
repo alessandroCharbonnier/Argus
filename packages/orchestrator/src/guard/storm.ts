@@ -6,12 +6,16 @@ export interface HttpEntry {
   timestamp: number;
 }
 
-/** A node failed on infra iff its HTTP log shows 5xx/connection errors in the window. */
+const INFRA_ERROR =
+  /(ECONNREFUSED|ENOTFOUND|ETIMEDOUT|CONNECTION_REFUSED|NAME_NOT_RESOLVED|TIMED_OUT|INTERNET_DISCONNECTED|ERR_CONNECTION|ERR_NETWORK|ERR_TIMED_OUT)/i;
+
+/** A node failed on infra iff its HTTP log shows 5xx or a connection-level error in the window. */
 export function classifyInfra(http: HttpEntry[], windowStart: number): boolean {
   return http.some(
     (e) =>
       e.timestamp >= windowStart &&
-      (e.error !== undefined || (e.status !== undefined && e.status >= 500)),
+      ((e.status !== undefined && e.status >= 500) ||
+        (e.error !== undefined && INFRA_ERROR.test(e.error))),
   );
 }
 

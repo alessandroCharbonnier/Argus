@@ -185,10 +185,11 @@ export function validatePlan(
   }
 
   // ---- project_root / output_dir -------------------------------------------------
+  const planDir = path.dirname(planPath);
   const projectRootRaw = asString(rootMap['project_root'], ctx, 'project_root');
   const projectRoot = projectRootRaw
-    ? path.resolve(path.dirname(planPath), interpolate(projectRootRaw, undefined, ctx))
-    : path.dirname(planPath);
+    ? path.resolve(planDir, interpolate(projectRootRaw, undefined, ctx))
+    : path.resolve(planDir);
   const outputDirRaw = asString(rootMap['output_dir'], ctx, 'output_dir');
   const outputDir = outputDirRaw
     ? path.resolve(projectRoot, interpolate(outputDirRaw, undefined, ctx))

@@ -7,16 +7,16 @@ human-friendly at once. Field semantics are exact; read them literally.
 
 ```yaml
 env:
-  base_url: http://localhost:3000            # absolute http(s) URL
-  workers: 2                                 # fixed pool size
-  version_endpoint: /api/version             # polled for drift; "off" disables
+  base_url: http://localhost:3000 # absolute http(s) URL
+  workers: 2 # fixed pool size
+  version_endpoint: /api/version # polled for drift; "off" disables
   env_marker:
-    url: /api/health                         # parsed JSON, compared field-by-field
-    expect_json: { env: staging }            # strict-typed SUBSET match
-  vars: { FLAG: "1" }                        # passed to every node process
+    url: /api/health # parsed JSON, compared field-by-field
+    expect_json: { env: staging } # strict-typed SUBSET match
+  vars: { FLAG: '1' } # passed to every node process
 
 reset:
-  http:                                      # same-origin as base_url
+  http: # same-origin as base_url
     url: /api/e2e/reset
     method: POST
   # command: 'curl -X POST http://localhost:5000/api/e2e/reset'
@@ -100,9 +100,9 @@ Every node process receives `BASE_URL`, `ARTIFACTS_DIR`,
 - id: crawl-baseline
   kind: crawl
   depends_on: [seed-accounts]
-  login: specs/login-as-admin.spec.ts   # optional; runs first, saves a session
+  login: specs/login-as-admin.spec.ts # optional; runs first, saves a session
   urls: ['/']
-  sitemap: /sitemap.xml                 # optional, unioned with urls
+  sitemap: /sitemap.xml # optional, unioned with urls
 ```
 
 The login snippet is an ordinary Playwright spec that navigates and saves the

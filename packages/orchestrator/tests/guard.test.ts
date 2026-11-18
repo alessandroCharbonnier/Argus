@@ -37,6 +37,10 @@ describe('classifyInfra', () => {
     expect(classifyInfra([{ error: 'ECONNREFUSED', timestamp: 10 }], 0)).toBe(true);
   });
 
+  it('does not flag CORS or generic request failures as infra', () => {
+    expect(classifyInfra([{ error: 'net::ERR_FAILED', timestamp: 10 }], 0)).toBe(false);
+  });
+
   it('ignores 4xx and assertion failures', () => {
     expect(classifyInfra([{ status: 404, timestamp: 10 }], 0)).toBe(false);
   });

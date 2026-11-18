@@ -21,7 +21,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), versioning follows
   serialization, `exclusive` pool drain, critical abort, cascade skip, opt-in
   retry with attempt namespaces, blocked-infra hold-and-requeue.
 - Node runner: spawns `node <playwright-cli> test <spec> --project=chromium
-  --workers=1`, per-node timeout with process-tree kill, JSON reporter parsing,
+--workers=1`, per-node timeout with process-tree kill, JSON reporter parsing,
   recorder heartbeat check, failure-artifact capture (temp output dir).
 - Artifacts: `publish()`/`grab()` helpers (transitive ancestors, runtime
   checked), file-based ancestor map, output verification, `--node --from-run`

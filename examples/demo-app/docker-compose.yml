@@ -1,0 +1,15 @@
+services:
+  demo:
+    build:
+      context: ../..
+      dockerfile: examples/demo-app/Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      PORT: '3000'
+      ARGUS_DEMO_DB: /data/demo.db
+    volumes:
+      - demo-db:/data
+
+volumes:
+  demo-db:

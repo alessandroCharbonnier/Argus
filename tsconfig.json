@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@e2e-orchestrator/cli": ["packages/orchestrator/src/index.ts"],
+      "@e2e-orchestrator/playwright": ["packages/playwright/src/index.ts"]
+    }
+  },
+  "include": ["packages", "examples", "vitest.config.ts"]
+}

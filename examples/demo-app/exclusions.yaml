@@ -1,0 +1,4 @@
+# Controls the element gate may ignore. Values are exact identity keys:
+#   link:<href>                  for <a> elements (destination-keyed)
+#   <tag>:<route>:<label>        for everything else
+[]

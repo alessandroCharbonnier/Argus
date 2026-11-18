@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.db
+.argus/
+.scratch/
+.scratch*
+coverage/
+test-results/
+playwright-report/
+blob-report/
+artifacts/
+*.log
+.env
+.env.*
+!.env.example

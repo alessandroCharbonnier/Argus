@@ -1,0 +1,55 @@
+{
+  "name": "argus",
+  "version": "0.1.0",
+  "description": "Dependency-graph orchestrator for Playwright E2E tests against a real staging backend — artifact hand-offs, environment guard, and an every-button-exercised gate.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "e2e-orchestrator": "./packages/orchestrator/dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p packages/orchestrator/tsconfig.json && tsc -p packages/playwright/tsconfig.json && tsc -p examples/demo-app/tsconfig.json",
+    "test": "vitest run --no-file-parallelism",
+    "test:watch": "vitest --no-file-parallelism",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "demo:e2e": "node examples/demo-app/scripts/run-e2e.mjs",
+    "demo:e2e:compose": "node examples/demo-app/scripts/run-e2e-compose.mjs",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.49.0",
+    "express": "^4.21.0",
+    "playwright": "^1.49.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/js": "^9.30.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.0",
+    "eslint": "^9.30.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.30.0",
+    "vitest": "^3.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+# Argus demo plan — one tiny app, two pages, one button flow, two crawl passes.
+project_root: .
+
+env:
+  base_url: http://localhost:3000
+  workers: 2
+  version_endpoint: /api/version
+  env_marker:
+    url: /api/health
+    expect_json: { env: staging }
+  vars:
+    DEMO_EXTRA: '1'
+
+reset:
+  http:
+    url: /api/e2e/reset
+    method: POST
+  verify:
+    url: /api/health
+    expect_status: 200
+    expect_json: { seeded: true }
+
+tests:
+  - id: create-accounts
+    spec: specs/create-account.spec.ts
+    critical: true
+    outputs: [account_id, account_email]
+
+  - id: crawl-baseline
+    kind: crawl
+    depends_on: [create-accounts]
+    login: specs/login-as-admin.spec.ts
+    urls: ['/']
+
+  - id: account-journey
+    spec: specs/account-journey.spec.ts
+    depends_on: [create-accounts, crawl-baseline]
+    reads: [account_id]
+
+  - id: crawl-final
+    kind: crawl
+    depends_on: [account-journey]
+    login: specs/login-as-admin.spec.ts
+    urls: ['/']

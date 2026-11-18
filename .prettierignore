@@ -1,0 +1,10 @@
+# User-maintained design doc — not machine-formatted.
+PLAN.md
+package-lock.json
+dist/
+.argus/
+.scratch/
+coverage/
+test-results/
+playwright-report/
+blob-report/

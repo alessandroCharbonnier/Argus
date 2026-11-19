@@ -65,7 +65,7 @@ export async function httpRequest(
     return { status: res.status, bodyText, bodyJson };
   }
 
-  const cause = (lastErr as Error & { cause?: Error } | undefined)?.cause;
+  const cause = (lastErr as (Error & { cause?: Error }) | undefined)?.cause;
   const detail = cause ? `${cause.message} (${cause.name})` : lastErr?.message;
   throw new GuardError(`request failed: ${method} ${url}: ${detail ?? 'unknown'}`);
 }

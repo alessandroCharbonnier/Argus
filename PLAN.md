@@ -298,4 +298,85 @@ These supersede any conflicting text above. Resolved forks:
 - **Behaviour:** the bundled demo run (fresh run passes; critical failure →
   exit 1; gate miss → exit 4). The demo *is* the fake backend.
 
+---
+
+## 15. Fault-injection rides (grilling session, 2026-11-19)
+
+The product is viewed as: **an automated user journey where the user is
+actively trying to break the app** — account creation → basket → payment,
+while being an "absolute monkey". The goal is not "does the payment work" but
+"does the journey survive when the backend breaks". This section locks the
+fault-injection design; the self-describing/agent story is §16.
+
+### Design (locked)
+
+- **Injection surface:** Playwright **route interception** (default, in-process,
+  deterministic) for transport faults; **command hooks** (opt-in) for deep
+  faults a route layer cannot reach (`docker compose stop db`).
+- **Determinism:** a declared fault matrix, swept in **fixed order**, injected
+  at a declared **URL pattern** — not random, not hand-scripted per step.
+- **Grace check — four failure modes, not one:** a pass is *graceful* only if
+  none of these happened:
+  1. **crashed** — uncaught exception / `pageerror` / blank page,
+  2. **silent** — no crash, but the app showed the user nothing (raw 5xx or a
+     stuck spinner),
+  3. **stranded** — error shown, but retry/back cannot recover,
+  4. **robbed** — journey "succeeded" but state corrupted (empty basket,
+     duplicate charge).
+- **Auto-invariants (zero authoring):** no `pageerror`; page has content after
+  the fault; recovery probe (lift fault, retry the action, retry succeeds).
+- **Declared grace contract (agent-written):** `error_selector` (the visible
+  error element — catches *silent*) + `state_check` (the clean-pass assertions
+  re-checked after the fault — catches *robbed*).
+
+### Plan surface
+
+```yaml
+tests:
+  - id: payment-journey
+    spec: specs/payment.spec.ts
+    faults:
+      when: POST /api/payment          # injection point: METHOD /path or /path
+      sweep: [clean, timeout, 5xx, reset, latency]   # fixed order; clean always first
+      fail: true                        # default: ungraceful pass fails the run
+      allow: [reset]                    # known-issue allowlist (excluded from failing)
+      error_selector: '[data-testid="payment-error"]'
+```
+
+### Fault taxonomy (deterministic)
+
+| type     | route behavior                                     | what it simulates                  |
+| -------- | -------------------------------------------------- | ---------------------------------- |
+| `clean`  | no injection                                       | baseline journey works             |
+| `timeout`| handler never resolves                             | request hangs forever              |
+| `5xx`    | `route.fulfill({ status: 503 })`                   | upstream returns 5xx               |
+| `reset`  | `route.abort('connectionreset')`                   | connection reset mid-request       |
+| `latency`| delay then `route.continue()`                      | stalled upstream                   |
+
+### Semantics
+
+- The fault sweep is **inside one node**; each pass re-runs the same spec once,
+  with `ARGUS_FAULT` env carrying `{ type, when, pass }`.
+- The node passes iff `clean` passes **and** every non-allowed fault pass is
+  graceful. Ungraceful + `fail: true` → node `failed`, exit `1`, detail names
+  the fault. `fail: false` → report-only for that journey.
+- The wrapper exposes an `argusFault` fixture (the current fault, or `null` on
+  `clean`) so specs can branch: assert the normal outcome on `clean`, assert
+  `error_selector` + `state_check` on fault passes.
+
+## 16. Self-describing app / agent-authored tests (v2 direction)
+
+Vision: **no human writes tests** — coding agents do. The app describes itself
+(via the crawler), and agents generate the monkey tests + fault rides from that
+description.
+
+- Add a **`describe`/`inspect` mode**: crawl the app and emit a machine-readable
+  **app manifest** (routes, controls per route, roles, forms, flows, sitemap) —
+  the input an agent consumes to generate specs.
+- The manifest + `--print-schema` + `docs/authoring.md` form the complete
+  agent-facing contract.
+- The fault-injection oracle is mechanical enough for agents to write:
+  crash-freedom, an `error_selector` must appear, state must survive, recovery
+  must work.
+
 

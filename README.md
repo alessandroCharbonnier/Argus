@@ -1,13 +1,13 @@
 # Argus
 
 Dependency-graph orchestrator for **Playwright E2E tests against a real staging
-backend** — artifact hand-offs, an environment guard, and an
-every-button-exercised gate.
+backend** — artifact hand-offs, an environment guard, an
+every-button-exercised gate, and **deterministic fault-injection rides**.
 
 Argus is a **thin scheduler over Playwright**, not a test engine. Playwright
 owns execution, reporters, traces, and videos. Argus builds only what Playwright
 cannot: the dependency graph, resource contracts, the environment guard,
-critical/exclusive scheduling, and the element gate.
+critical/exclusive scheduling, the element gate, and fault injection.
 
 ## Why
 
@@ -20,6 +20,10 @@ critical/exclusive scheduling, and the element gate.
 - **Every-button gate** — a crawler builds the denominator (all discoverable
   controls), a recorder of trusted (`isTrusted`) interactions builds the
   numerator; uncovered controls fail the gate unless excluded.
+- **Fault-injection rides** — the user journey re-runs once per fault
+  (`clean`, `timeout`, `5xx`, `reset`, `latency`), injected at a declared URL.
+  A pass is _graceful_ only if the user was not crashed, silenced, stranded, or
+  robbed — the four failure modes the gate checks.
 
 ## Quickstart
 

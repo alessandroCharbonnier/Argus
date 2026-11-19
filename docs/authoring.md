@@ -126,6 +126,57 @@ test('save a session for the crawler', async ({ page }) => {
 - `exclusions.yaml` lists exact identity keys the gate may ignore.
 - The gate measures **exercised**, not "works" — assertions prove "works".
 
+## Fault-injection rides
+
+The product is an **automated user journey where the user is actively trying to
+break the app**. A node can declare a deterministic fault sweep — the same spec
+re-runs once per fault, in fixed order, with the fault injected at a URL.
+
+```yaml
+- id: payment-journey
+  spec: specs/payment.spec.ts
+  faults:
+    when: POST /api/payment # injection point: METHOD /path or /path
+    sweep: [clean, timeout, 5xx, reset, latency] # fixed order; clean always first
+    fail: true # default: ungraceful pass fails the run
+    allow: [reset] # known-issue allowlist
+    error_selector: '[data-testid="payment-error"]'
+```
+
+- `when` is a URL match (substring of pathname, with `*` glob). The first
+  matching request in each pass gets the fault.
+- Fault taxonomy: `clean` (no injection) · `timeout` (request hangs) · `5xx`
+  (503) · `reset` (connection reset) · `latency` (stalled then completes).
+- The node passes iff `clean` passes **and** every non-allowed fault pass is
+  graceful. Ungraceful + `fail: true` → node `failed`, exit `1`.
+
+### Writing a fault-aware spec
+
+The wrapper exposes an `argusFault` fixture (`null` on the clean pass):
+
+```ts
+test('payment journey survives faults', async ({ page, argusFault }) => {
+  await page.goto('/');
+  // ... drive the journey up to the payment ...
+  await page.getByTestId('pay').click();
+  if (argusFault && ['timeout', '5xx', 'reset'].includes(argusFault.type)) {
+    await expect(page.getByTestId('payment-error')).toBeVisible(); // graceful
+  } else {
+    await expect(page).toHaveURL(/\/confirmation/); // normal success
+  }
+});
+```
+
+### The four ways a fault pass can fail (and what to assert)
+
+1. **crashed** — uncaught exception / `pageerror` (auto-detected).
+2. **silent** — no crash, but no error element shown (`error_selector`).
+3. **stranded** — error shown, but retry/back cannot recover.
+4. **robbed** — journey "succeeded" but state corrupted (empty basket,
+   duplicate charge) — assert with `state_check`.
+
+A pass is graceful only if none of the four happened.
+
 ## Redaction
 
 Traces, videos, and `publish()` artifacts can contain passwords. v1 ships a

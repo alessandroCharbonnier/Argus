@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { RunPaths } from './artifacts.js';
 import { writeJson } from './artifacts.js';
 import type { GateReport } from './gate/gate.js';
+import type { FaultPassResult } from './runner/runner.js';
 
 export interface NodeReport {
   id: string;
@@ -11,6 +12,7 @@ export interface NodeReport {
   durationMs?: number;
   detail?: string;
   flaky?: boolean;
+  faults?: FaultPassResult[];
 }
 
 export interface RunReport {
@@ -55,9 +57,14 @@ export function writeHtmlReport(paths: RunPaths, report: RunReport): void {
   const rows = report.nodes
     .map((n) => {
       const cls = n.state === 'passed' ? 'ok' : n.state === 'skipped' ? 'skip' : 'bad';
+      const faultSummary = n.faults
+        ? `<div class="faults">${n.faults
+            .map((f) => `${escapeHtml(f.type)}:${f.outcome === 'passed' ? 'ok' : 'FAIL'}`)
+            .join(' ')}</div>`
+        : '';
       return `<tr class="${cls}"><td>${escapeHtml(n.id)}</td><td>${escapeHtml(n.state)}</td><td>${
         n.attempts
-      }</td><td>${n.durationMs ?? ''}</td><td>${escapeHtml(n.detail ?? '')}</td></tr>`;
+      }</td><td>${n.durationMs ?? ''}</td><td>${escapeHtml(n.detail ?? '')}${faultSummary}</td></tr>`;
     })
     .join('');
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Plan, TestNode } from '../src/plan/types.js';
 import { runPaths } from '../src/artifacts.js';
-import { buildNodeEnv, parsePlaywrightJson } from '../src/runner/runner.js';
+import { aggregateFaultPasses, buildNodeEnv, parsePlaywrightJson } from '../src/runner/runner.js';
+import type { FaultsConfig } from '../src/plan/types.js';
 
 const node: TestNode = {
   id: 'a',
@@ -89,5 +90,55 @@ describe('parsePlaywrightJson', () => {
       ],
     });
     expect(parsePlaywrightJson(stdout)?.firstError).toContain('Expected 1 to be 2');
+  });
+});
+
+describe('aggregateFaultPasses', () => {
+  const faults: FaultsConfig = {
+    when: 'POST /api/payment',
+    sweep: ['clean', 'timeout', '5xx'],
+    fail: true,
+    allow: [],
+  };
+  const pass = (type: string, outcome: 'passed' | 'failed') => ({
+    type,
+    outcome,
+    durationMs: 1,
+  });
+
+  it('passes when clean and every fault pass pass', () => {
+    const res = aggregateFaultPasses(
+      [pass('clean', 'passed'), pass('timeout', 'passed'), pass('5xx', 'passed')],
+      faults,
+    );
+    expect(res.outcome).toBe('passed');
+  });
+
+  it('fails when the clean pass fails', () => {
+    const res = aggregateFaultPasses([pass('clean', 'failed'), pass('timeout', 'passed')], faults);
+    expect(res.outcome).toBe('failed');
+    expect(res.detail).toContain('clean pass failed');
+  });
+
+  it('fails on an ungraceful fault pass', () => {
+    const res = aggregateFaultPasses([pass('clean', 'passed'), pass('5xx', 'failed')], faults);
+    expect(res.outcome).toBe('failed');
+    expect(res.detail).toContain('ungraceful under 5xx');
+  });
+
+  it('ignores allowed fault types', () => {
+    const res = aggregateFaultPasses([pass('clean', 'passed'), pass('5xx', 'failed')], {
+      ...faults,
+      allow: ['5xx'],
+    });
+    expect(res.outcome).toBe('passed');
+  });
+
+  it('reports-only when fail is false', () => {
+    const res = aggregateFaultPasses([pass('clean', 'passed'), pass('5xx', 'failed')], {
+      ...faults,
+      fail: false,
+    });
+    expect(res.outcome).toBe('passed');
   });
 });

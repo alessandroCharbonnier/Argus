@@ -9,7 +9,7 @@ import {
   webkit,
   test as base,
 } from '@playwright/test';
-import type { BrowserContext } from '@playwright/test';
+import type { BrowserContext, Route } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -43,10 +43,17 @@ export interface RecordedConsole {
   timestamp: number;
 }
 
+export interface FaultContext {
+  type: string; // 'clean' | 'timeout' | '5xx' | 'reset' | 'latency'
+  when: string; // injection point, e.g. 'POST /api/payment'
+  pass: number; // sweep index (0 = clean)
+}
+
 // Per-process accumulators: one orchestrator node = one spawned spec process.
 const events: RecordedEvent[] = [];
 const http: RecordedHttp[] = [];
 const consoleMessages: RecordedConsole[] = [];
+const pageErrors: string[] = [];
 
 function artifactDir(): string | undefined {
   return process.env.ARTIFACTS_DIR;
@@ -60,6 +67,7 @@ function flush(): void {
   writeFileSync(path.join(dir, 'recorded.json'), JSON.stringify(trusted));
   writeFileSync(path.join(dir, 'http.json'), JSON.stringify(http));
   writeFileSync(path.join(dir, 'console.json'), JSON.stringify(consoleMessages));
+  writeFileSync(path.join(dir, 'pageerrors.json'), JSON.stringify(pageErrors));
   writeFileSync(
     path.join(dir, 'heartbeat.json'),
     JSON.stringify({ heartbeat: true, events: trusted.length, at: Date.now() }),
@@ -184,14 +192,74 @@ async function installRecorder(context: BrowserContext): Promise<void> {
   context.on('console', (m) =>
     consoleMessages.push({ type: m.type(), text: m.text(), timestamp: Date.now() }),
   );
+  context.on('weberror', (e) => pageErrors.push(e.error().message));
 }
 
-export const test = base.extend<{ argusRecorder: void }, object>({
+function currentFault(): FaultContext | null {
+  const raw = process.env.ARGUS_FAULT;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { type: string; when: string; pass: number };
+    return { type: parsed.type, when: parsed.when, pass: parsed.pass };
+  } catch {
+    return null;
+  }
+}
+
+function parseWhen(when: string): { method: string; glob: RegExp } {
+  const m = when.match(/^(\S+)\s+(\S.*)$/);
+  const method = m ? m[1]!.toUpperCase() : '*';
+  const pathPart = m ? m[2]! : when;
+  const escaped = pathPart.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*');
+  return { method, glob: new RegExp(escaped) };
+}
+
+/** Deterministic transport-fault injection via route interception. */
+function installFault(context: BrowserContext, fault: FaultContext): void {
+  if (fault.type === 'clean') return;
+  const { method, glob } = parseWhen(fault.when);
+  const handler = async (route: Route): Promise<void> => {
+    if (method !== '*' && route.request().method().toUpperCase() !== method) {
+      await route.continue();
+      return;
+    }
+    switch (fault.type) {
+      case 'timeout':
+        return; // never resolve → the request hangs
+      case '5xx':
+        await route.fulfill({ status: 503, body: 'service unavailable (fault injected)' });
+        return;
+      case 'reset':
+        await route.abort('connectionreset');
+        return;
+      case 'latency':
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await route.continue();
+        return;
+      default:
+        await route.continue();
+    }
+  };
+  void context.route((url) => glob.test(url.pathname), handler);
+}
+
+export const test = base.extend<{ argusRecorder: void; argusFault: FaultContext | null }, object>({
   argusRecorder: [
     async ({ context }, use) => {
-      if (artifactDir()) await installRecorder(context);
+      if (artifactDir()) {
+        await installRecorder(context);
+        const fault = currentFault();
+        if (fault) installFault(context, fault);
+      }
       await use();
       flush();
+    },
+    { auto: true },
+  ],
+  argusFault: [
+    // eslint-disable-next-line no-empty-pattern -- Playwright requires object destructuring
+    async ({}, use) => {
+      await use(currentFault());
     },
     { auto: true },
   ],

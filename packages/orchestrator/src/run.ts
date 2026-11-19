@@ -284,6 +284,7 @@ function buildReport(
       durationMs: meta?.durationMs,
       detail: summary?.details.get(n.id) ?? meta?.detail,
       flaky: state === 'passed' && attempts > 1,
+      faults: meta?.faults,
     };
   });
   return {
@@ -352,8 +353,15 @@ async function schedule(
         attempts: attempt,
         durationMs: out.durationMs,
         detail: out.detail,
+        faults: out.passes,
       });
-      if (out.outcome === 'failed' && classifyInfra(out.httpLog, storm.windowStart)) {
+      // Injected faults pollute http.json with 5xx/resets — never classify a
+      // fault-ride node as blocked: infra.
+      if (
+        out.outcome === 'failed' &&
+        !node.faults &&
+        classifyInfra(out.httpLog, storm.windowStart)
+      ) {
         storm.freeze();
         return { outcome: 'blocked', detail: 'blocked: infra (5xx or connection errors)' };
       }

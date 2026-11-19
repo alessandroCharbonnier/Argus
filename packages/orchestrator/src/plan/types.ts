@@ -37,6 +37,17 @@ export interface ResetConfig {
 
 export type NodeKind = 'test' | 'crawl';
 
+export type FaultType = 'clean' | 'timeout' | '5xx' | 'reset' | 'latency';
+
+export interface FaultsConfig {
+  when: string; // injection point: `METHOD /path` or `/path`
+  sweep: FaultType[]; // fixed order; clean always first
+  fail: boolean; // ungraceful pass fails the node
+  allow: FaultType[]; // known-issue allowlist
+  error_selector?: string; // must become visible on fault passes
+  command?: string; // opt-in deep fault (reserved, outside the sweep)
+}
+
 export interface TestNode {
   id: string;
   kind: NodeKind;
@@ -55,6 +66,8 @@ export interface TestNode {
   urls: string[];
   sitemap?: string;
   login?: string;
+  // fault-injection rides
+  faults?: FaultsConfig;
 }
 
 export interface Plan {
@@ -70,3 +83,5 @@ export const DEFAULT_NODE_TIMEOUT_SECONDS = 15 * 60;
 export const DEFAULT_DRIFT_INTERVAL_SECONDS = 10 * 60;
 export const DEFAULT_STORM_PROBE_SECONDS = 60;
 export const DEFAULT_STORM_TIMEOUT_SECONDS = 10 * 60;
+export const DEFAULT_FAULT_SWEEP: FaultType[] = ['clean', 'timeout', '5xx', 'reset', 'latency'];
+export const FAULT_TYPES: FaultType[] = ['clean', 'timeout', '5xx', 'reset', 'latency'];

@@ -124,4 +124,24 @@ describe('plan validation', () => {
       delete process.env.TIMEOUT;
     }
   });
+
+  it('accepts a faults block with a default sweep', () => {
+    const yaml = `${ENV}${RESET}\ntests:\n  - id: pay\n    spec: specs/pay.spec.ts\n    faults:\n      when: POST /api/payment\n`;
+    const { load } = makePlan(yaml, ['pay.spec.ts']);
+    const plan = load() as { tests: { faults?: { when: string; sweep: string[] } }[] };
+    expect(plan.tests[0]!.faults?.when).toBe('POST /api/payment');
+    expect(plan.tests[0]!.faults?.sweep).toEqual(['clean', 'timeout', '5xx', 'reset', 'latency']);
+  });
+
+  it('rejects an unknown fault type', () => {
+    const yaml = `${ENV}${RESET}\ntests:\n  - id: pay\n    spec: specs/pay.spec.ts\n    faults:\n      when: POST /api/payment\n      sweep: [clean, boom]\n`;
+    const { load } = makePlan(yaml, ['pay.spec.ts']);
+    expect(() => load()).toThrow(/unknown fault type/);
+  });
+
+  it('rejects a faults block without when', () => {
+    const yaml = `${ENV}${RESET}\ntests:\n  - id: pay\n    spec: specs/pay.spec.ts\n    faults:\n      sweep: [clean]\n`;
+    const { load } = makePlan(yaml, ['pay.spec.ts']);
+    expect(() => load()).toThrow(/when is required/);
+  });
 });

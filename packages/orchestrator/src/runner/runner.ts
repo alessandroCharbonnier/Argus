@@ -5,7 +5,7 @@ import type { RunPaths } from '../artifacts.js';
 import { nodeAttemptDir, writeJson } from '../artifacts.js';
 import { crawlNode } from '../crawler.js';
 import type { HttpEntry } from '../guard/storm.js';
-import type { Plan, TestNode } from '../plan/types.js';
+import type { FaultsConfig, FaultType, Plan, TestNode } from '../plan/types.js';
 import { spawnWithTimeout } from './kill.js';
 import { resolvePlaywrightCli } from './pw.js';
 
@@ -14,6 +14,38 @@ export interface NodeRunOutcome {
   detail?: string;
   durationMs: number;
   httpLog: HttpEntry[];
+  passes?: FaultPassResult[];
+}
+
+export interface FaultPassResult {
+  type: string;
+  outcome: 'passed' | 'failed';
+  detail?: string;
+  durationMs: number;
+}
+
+export function aggregateFaultPasses(
+  passes: FaultPassResult[],
+  faults: FaultsConfig,
+): { outcome: 'passed' | 'failed'; detail?: string } {
+  const clean = passes.find((p) => p.type === 'clean');
+  if (!clean || clean.outcome !== 'passed') {
+    return {
+      outcome: 'failed',
+      detail: clean ? `clean pass failed: ${clean.detail ?? ''}` : 'clean pass missing',
+    };
+  }
+  const ungraceful = passes.filter(
+    (p) =>
+      p.type !== 'clean' && p.outcome !== 'passed' && !faults.allow.includes(p.type as FaultType),
+  );
+  if (ungraceful.length > 0 && faults.fail) {
+    return {
+      outcome: 'failed',
+      detail: `ungraceful under ${ungraceful.map((p) => p.type).join(', ')}`,
+    };
+  }
+  return { outcome: 'passed' };
 }
 
 interface RunnerEnv {
@@ -156,7 +188,7 @@ export async function runNode(opts: RunnerEnv): Promise<NodeRunOutcome> {
   return runTestNode(opts, env, dir);
 }
 
-async function runTestNode(
+async function runOnePass(
   opts: RunnerEnv,
   env: NodeJS.ProcessEnv,
   dir: string,
@@ -200,6 +232,7 @@ async function runTestNode(
   const durationMs = Date.now() - started;
   const httpLog = readJsonIfExists<HttpEntry[]>(path.join(dir, 'http.json')) ?? [];
   const heartbeat = exists(path.join(dir, 'heartbeat.json'));
+  const pageErrors = readJsonIfExists<string[]>(path.join(dir, 'pageerrors.json')) ?? [];
   writeFileSync(path.join(dir, 'pw.stdout.txt'), result.stdout);
   writeFileSync(path.join(dir, 'pw.stderr.txt'), result.stderr);
 
@@ -231,6 +264,13 @@ async function runTestNode(
         durationMs,
         httpLog,
       };
+    } else if (pageErrors.length > 0) {
+      outcome = {
+        outcome: 'failed',
+        detail: `pageerror: ${pageErrors[0]}`,
+        durationMs,
+        httpLog,
+      };
     } else if (!heartbeat) {
       outcome = {
         outcome: 'failed',
@@ -250,6 +290,36 @@ async function runTestNode(
   }
   rmSync(outputDir, { recursive: true, force: true });
   return outcome;
+}
+
+async function runTestNode(
+  opts: RunnerEnv,
+  env: NodeJS.ProcessEnv,
+  dir: string,
+): Promise<NodeRunOutcome> {
+  const { node } = opts;
+  if (!node.faults) {
+    return runOnePass(opts, env, dir);
+  }
+  const passes: FaultPassResult[] = [];
+  let cleanHttpLog: HttpEntry[] = [];
+  for (const [i, type] of node.faults.sweep.entries()) {
+    const passEnv = {
+      ...env,
+      ARGUS_FAULT: JSON.stringify({ type, when: node.faults.when, pass: i }),
+    };
+    const res = await runOnePass(opts, passEnv, dir);
+    if (type === 'clean') cleanHttpLog = res.httpLog;
+    passes.push({ type, outcome: res.outcome, detail: res.detail, durationMs: res.durationMs });
+  }
+  const agg = aggregateFaultPasses(passes, node.faults);
+  return {
+    outcome: agg.outcome,
+    detail: agg.detail,
+    durationMs: passes.reduce((s, p) => s + p.durationMs, 0),
+    httpLog: cleanHttpLog,
+    passes,
+  };
 }
 
 async function runCrawlNode(

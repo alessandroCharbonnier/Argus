@@ -28,6 +28,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/), versioning follows
   replay.
 - Element gate: crawler graph node (login snippet, urls/sitemap, two passes),
   trusted-interaction recorder, shared identity-key function, `exclusions.yaml`.
+- Fault-injection rides: `faults:` block on a node (deterministic sweep —
+  `clean`, `timeout`, `5xx`, `reset`, `latency` — injected at a URL pattern via
+  Playwright route interception), `argusFault` fixture, page-error detection,
+  four-mode grace check (crash/silent/stranded/robbed), `fail` toggle +
+  `allow` list, per-fault report breakdown.
 - Reporting: live terminal line, `report.json`, self-contained HTML report,
   per-failed-node artifacts (screenshot/video/trace/console/http).
 - Example: Express + SQLite demo app, `e2e-plan.yaml`, two specs with

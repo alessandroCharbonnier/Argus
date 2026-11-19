@@ -42,3 +42,9 @@ tests:
     depends_on: [account-journey]
     login: specs/login-as-admin.spec.ts
     urls: ['/']
+
+  - id: checkout
+    spec: specs/checkout.spec.ts
+    faults:
+      when: POST /api/checkout
+      sweep: [clean, timeout, 5xx, reset, latency]

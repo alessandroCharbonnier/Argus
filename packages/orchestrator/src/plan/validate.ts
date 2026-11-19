@@ -6,11 +6,13 @@ import { ancestorsOf, buildGraph } from '../graph.js';
 import type { Annotated } from './annotate.js';
 import {
   DEFAULT_DRIFT_INTERVAL_SECONDS,
+  DEFAULT_FAULT_SWEEP,
   DEFAULT_NODE_TIMEOUT_SECONDS,
   DEFAULT_STORM_PROBE_SECONDS,
   DEFAULT_STORM_TIMEOUT_SECONDS,
+  FAULT_TYPES,
 } from './types.js';
-import type { EnvConfig, Plan, ResetConfig, TestNode } from './types.js';
+import type { EnvConfig, FaultsConfig, FaultType, Plan, ResetConfig, TestNode } from './types.js';
 
 interface Ctx {
   env: NodeJS.ProcessEnv;
@@ -397,6 +399,42 @@ export function validatePlan(
     const sitemap = asString(nodeMap['sitemap'], ctx, `tests.${id}.sitemap`);
     const login = asString(nodeMap['login'], ctx, `tests.${id}.login`);
 
+    // ---- fault-injection rides ----------------------------------------------------
+    const faultsMap = asMap(nodeMap['faults'], ctx, `tests.${id}.faults`);
+    let faults: FaultsConfig | undefined;
+    if (faultsMap) {
+      const when = str(faultsMap['when'], ctx, `tests.${id}.faults.when`);
+      if (when === undefined || when === '') {
+        issue(
+          ctx,
+          `tests.${id}.faults.when is required (injection point, e.g. 'POST /api/payment')`,
+          nodeMap['faults']?.line,
+        );
+      }
+      const sweepRaw = asStringList(faultsMap['sweep'], ctx, `tests.${id}.faults.sweep`);
+      for (const t of sweepRaw) {
+        if (!FAULT_TYPES.includes(t as FaultType)) {
+          issue(
+            ctx,
+            `tests.${id}.faults.sweep: unknown fault type \`${t}\``,
+            faultsMap['sweep']?.line,
+          );
+        }
+      }
+      const allowRaw = asStringList(faultsMap['allow'], ctx, `tests.${id}.faults.allow`);
+      const sweep: FaultType[] =
+        sweepRaw.length > 0 ? ([...sweepRaw] as FaultType[]) : [...DEFAULT_FAULT_SWEEP];
+      if (!sweep.includes('clean')) sweep.unshift('clean');
+      faults = {
+        when: when ?? '',
+        sweep,
+        fail: asBool(faultsMap['fail'], ctx, `tests.${id}.faults.fail`, true),
+        allow: allowRaw as FaultType[],
+        error_selector: str(faultsMap['error_selector'], ctx, `tests.${id}.faults.error_selector`),
+        command: str(faultsMap['command'], ctx, `tests.${id}.faults.command`),
+      };
+    }
+
     if (kind === 'test' && spec === undefined) {
       issue(ctx, `tests.${id}.spec is required for kind: test`, item.line);
     }
@@ -421,6 +459,7 @@ export function validatePlan(
       urls,
       sitemap: sitemap ? interpolate(sitemap, nodeMap['sitemap']?.line, ctx) : undefined,
       login: login ? interpolate(login, nodeMap['login']?.line, ctx) : undefined,
+      faults,
     });
     depsOf.set(id, dependsOn);
   }

@@ -67,17 +67,37 @@ app.get('/api/version', (_req, res) => {
   res.type('text/plain').send('demo-v1');
 });
 
+app.post('/api/checkout', (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.get('/', (_req, res) => {
   const accounts = db
     .prepare('SELECT id, name, email FROM accounts ORDER BY id')
     .all() as unknown as Account[];
   const items = accounts.map((a) => `<li><a href="/accounts/${a.id}">${a.name}</a></li>`).join('');
-  res.send(`<!doctype html><html><body>
+  res.send(`<!doctype html><html><head><title>Argus demo</title></head><body>
     <h1>Argus demo</h1>
     <form method="post" action="/accounts">
       <label>Name <input name="name" required></label>
       <button type="submit" data-testid="create-account">Create account</button>
     </form>
+    <hr>
+    <button type="button" data-testid="checkout" onclick="checkout()">Checkout</button>
+    <div id="checkout-result"></div>
+    <script>
+      async function checkout() {
+        const out = document.getElementById('checkout-result');
+        out.innerHTML = '';
+        try {
+          const res = await fetch('/api/checkout', { method: 'POST', signal: AbortSignal.timeout(5000) });
+          if (!res.ok) throw new Error('bad status');
+          out.innerHTML = '<div data-testid="checkout-ok">ok</div>';
+        } catch {
+          out.innerHTML = '<div data-testid="checkout-error">Something went wrong</div>';
+        }
+      }
+    </script>
     <ul>${items}</ul>
   </body></html>`);
 });

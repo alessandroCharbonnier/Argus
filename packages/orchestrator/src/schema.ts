@@ -124,6 +124,36 @@ const SCHEMA = {
             type: 'string',
             description: 'Login spec that saves a session into ARTIFACTS_DIR.',
           },
+          faults: {
+            type: 'object',
+            required: ['when'],
+            properties: {
+              when: {
+                type: 'string',
+                description: 'Injection point, e.g. "POST /api/payment" or "/api/payment".',
+              },
+              sweep: {
+                type: 'array',
+                items: { type: 'string', enum: ['clean', 'timeout', '5xx', 'reset', 'latency'] },
+                description: 'Fault sweep in fixed order; clean is always first.',
+              },
+              fail: {
+                type: 'boolean',
+                default: true,
+                description: 'Ungraceful pass fails the node.',
+              },
+              allow: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Known-issue fault allowlist.',
+              },
+              error_selector: {
+                type: 'string',
+                description: 'Selector that must become visible on fault passes.',
+              },
+              command: { type: 'string', description: 'Opt-in deep fault command (reserved).' },
+            },
+          },
         },
       },
     },

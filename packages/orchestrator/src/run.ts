@@ -212,6 +212,8 @@ export async function run(planPath: string, opts: RunOptions = {}): Promise<RunR
     }
   }
 
+  if (fatal.reason) log(`fatal: ${fatal.reason}`);
+
   if (!fatal.reason && schedulerSummary && !schedulerSummary.aborted) {
     try {
       const collected = collectGate(plan, paths, schedulerSummary);

@@ -133,8 +133,16 @@ async function installRecorder(context: BrowserContext): Promise<void> {
     const emit = (entry: Record<string, unknown>): void => w.__argusRecord?.([entry]);
     const capture = (event: Event): void => {
       if (!event.isTrusted) return; // synthetic dispatchEvent never counts
-      const el = event.target as HTMLElement | null;
-      if (!el) return;
+      const raw = event.target as HTMLElement | null;
+      if (!raw) return;
+      // Resolve to the nearest interactive element so clicks on a <span>/<i>
+      // inside a <button>/<a> record the SAME tag the crawler enumerates —
+      // otherwise `button:` clicks land on the inner span and never match
+      // the gate's `button:` denominator. Selector mirrors crawler COLLECT.
+      const el =
+        (raw.closest(
+          'a[href], button, input, select, textarea, [role="button"], [role="link"], [onclick]',
+        ) as HTMLElement | null) ?? raw;
       const tag = el.tagName.toLowerCase();
       const text = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
       const name =

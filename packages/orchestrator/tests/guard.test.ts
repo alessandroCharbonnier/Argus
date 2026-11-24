@@ -86,3 +86,33 @@ describe('computeGate', () => {
     expect(gate.excluded).toHaveLength(1);
   });
 });
+
+describe('gate route patterns', () => {
+  it('collapses dynamic routes and hrefs onto their pattern', async () => {
+    const { normalizeRoute } = await import('../src/gate/identity.js');
+    expect(normalizeRoute('/admin/users/abc-123', ['/admin/users/:id'])).toBe('/admin/users/:id');
+    expect(normalizeRoute('/admin/users/abc/edit', ['/admin/users/:id'])).toBe(
+      '/admin/users/abc/edit',
+    );
+    expect(normalizeRoute('/admin/users', ['/admin/users/:id'])).toBe('/admin/users');
+    expect(normalizeRoute('/x', [])).toBe('/x');
+  });
+
+  it('matches recorded controls on a different id to the crawled one', () => {
+    const report = computeGate({
+      controls: [
+        { route: '/cheval/111', tag: 'button', text: 'Copier' },
+        { route: '/a', tag: 'a', href: '/cheval/111?tab=sante' },
+      ],
+      recorded: [
+        { route: '/cheval/222', tag: 'button', text: 'Copier' },
+        { route: '/a', tag: 'a', href: '/cheval/333?tab=sante' },
+      ],
+      exclusions: [],
+      routePatterns: ['/cheval/:code'],
+    });
+    expect(report.uncovered).toEqual([]);
+    expect(report.covered).toContain('button:/cheval/:code:Copier');
+    expect(report.covered).toContain('link:/cheval/:code?tab=sante');
+  });
+});

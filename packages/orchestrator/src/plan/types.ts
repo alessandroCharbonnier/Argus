@@ -70,6 +70,14 @@ export interface TestNode {
   faults?: FaultsConfig;
 }
 
+export interface GateConfig {
+  /**
+   * Route patterns (`/admin/users/:id`) that collapse dynamic routes and link
+   * hrefs into one gate identity, so runtime-generated IDs never mint new keys.
+   */
+  route_patterns: string[];
+}
+
 export interface Plan {
   file: string;
   project_root: string;
@@ -77,6 +85,7 @@ export interface Plan {
   env: EnvConfig;
   reset: ResetConfig;
   tests: TestNode[];
+  gate: GateConfig;
 }
 
 export const DEFAULT_NODE_TIMEOUT_SECONDS = 15 * 60;

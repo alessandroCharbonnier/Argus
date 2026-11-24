@@ -145,3 +145,29 @@ describe('plan validation', () => {
     expect(() => load()).toThrow(/when is required/);
   });
 });
+
+describe('gate + crawl placeholders', () => {
+  it('accepts gate.route_patterns and crawl {{key}} listed in reads', () => {
+    const { load } = makePlan(
+      `${ENV}${RESET}\ngate:\n  route_patterns: ['/cheval/:code']\ntests:\n  - id: w\n    spec: specs/w.spec.ts\n    outputs: [code]\n  - id: c\n    kind: crawl\n    depends_on: [w]\n    reads: [code]\n    urls: ['/cheval/{{code}}']\n`,
+      ['w.spec.ts'],
+    );
+    const plan = load() as { gate: { route_patterns: string[] } };
+    expect(plan.gate.route_patterns).toEqual(['/cheval/:code']);
+  });
+
+  it('rejects a crawl {{key}} that is not in reads', () => {
+    const { load } = makePlan(
+      `${ENV}${RESET}\ntests:\n  - id: c\n    kind: crawl\n    urls: ['/cheval/{{code}}']\n`,
+    );
+    expect(load).toThrow(PlanError);
+  });
+
+  it('rejects a route pattern without a leading slash', () => {
+    const { load } = makePlan(
+      `${ENV}${RESET}\ngate:\n  route_patterns: ['cheval/:code']\ntests:\n  - id: a\n    spec: specs/a.spec.ts\n`,
+      ['a.spec.ts'],
+    );
+    expect(load).toThrow(PlanError);
+  });
+});

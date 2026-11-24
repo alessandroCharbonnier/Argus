@@ -142,3 +142,20 @@ describe('aggregateFaultPasses', () => {
     expect(res.outcome).toBe('passed');
   });
 });
+
+describe('resolveCrawlUrls', () => {
+  it('fills placeholders from ancestor publish files and fails on missing keys', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const p = await import('node:path');
+    const { resolveCrawlUrls } = await import('../src/runner/runner.js');
+    const dir = mkdtempSync(p.join(tmpdir(), 'argus-crawl-'));
+    const pub = p.join(dir, 'publish.json');
+    writeFileSync(pub, JSON.stringify({ code: '2100000000000042' }));
+    expect(resolveCrawlUrls(['/cheval/{{code}}', '/x'], { w: pub })).toEqual([
+      '/cheval/2100000000000042',
+      '/x',
+    ]);
+    expect(() => resolveCrawlUrls(['/u/{{id}}'], { w: pub })).toThrow(/not published/);
+  });
+});

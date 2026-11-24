@@ -134,6 +134,7 @@ interface GateCollected {
   controls: ControlLike[];
   recorded: ControlLike[];
   exclusions: string[];
+  routePatterns: string[];
 }
 
 function collectGate(plan: Plan, paths: RunPaths, summary: SchedulerSummary): GateCollected {
@@ -151,7 +152,12 @@ function collectGate(plan: Plan, paths: RunPaths, summary: SchedulerSummary): Ga
       recorded.push(...(rec ?? []));
     }
   }
-  return { controls, recorded, exclusions: loadExclusions(plan.project_root) };
+  return {
+    controls,
+    recorded,
+    exclusions: loadExclusions(plan.project_root),
+    routePatterns: plan.gate?.route_patterns ?? [],
+  };
 }
 
 export async function run(planPath: string, opts: RunOptions = {}): Promise<RunResult> {

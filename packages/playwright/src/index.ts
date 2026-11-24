@@ -132,9 +132,14 @@ async function installRecorder(context: BrowserContext): Promise<void> {
     const w = window as unknown as { __argusRecord?: (entries: Record<string, unknown>[]) => void };
     const emit = (entry: Record<string, unknown>): void => w.__argusRecord?.([entry]);
     const capture = (event: Event): void => {
-      if (!event.isTrusted) return; // synthetic dispatchEvent never counts
       const raw = event.target as HTMLElement | null;
       if (!raw) return;
+      // Synthetic dispatchEvent never counts — except <select> input/change:
+      // there is no trusted way to pick an option (Playwright's selectOption,
+      // like the browser's own native picker, fires untrusted events).
+      const isSelectChange =
+        (event.type === 'change' || event.type === 'input') && raw.tagName === 'SELECT';
+      if (!event.isTrusted && !isSelectChange) return;
       // Resolve to the nearest interactive element so clicks on a <span>/<i>
       // inside a <button>/<a> record the SAME tag the crawler enumerates —
       // otherwise `button:` clicks land on the inner span and never match

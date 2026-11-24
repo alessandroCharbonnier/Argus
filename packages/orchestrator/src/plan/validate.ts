@@ -348,6 +348,18 @@ export function validatePlan(
   }
 
   // ---- tests ----------------------------------------------------------------------
+  const gateMap = rootMap['gate'] !== undefined ? asMap(rootMap['gate'], ctx, 'gate') : undefined;
+  const routePatterns = asStringList(gateMap?.['route_patterns'], ctx, 'gate.route_patterns');
+  for (const p of routePatterns) {
+    if (!p.startsWith('/')) {
+      issue(
+        ctx,
+        `gate.route_patterns: \`${p}\` must start with '/'`,
+        gateMap?.['route_patterns']?.line,
+      );
+    }
+  }
+
   const testsSeq = asSeq(rootMap['tests'], ctx, 'tests');
   if (!testsSeq || testsSeq.length === 0) {
     issue(ctx, 'tests must be a non-empty list', rootMap['tests']?.line);
@@ -477,6 +489,22 @@ export function validatePlan(
   // Cycle detection throws on any cycle; the graph edges are reused below.
   buildGraph([...ids], depsOf);
 
+  // crawl url placeholders {{key}} ⊆ reads
+  for (const node of nodes) {
+    if (node.kind !== 'crawl') continue;
+    for (const u of node.urls) {
+      for (const m of u.matchAll(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g)) {
+        if (!node.reads.includes(m[1]!)) {
+          issue(
+            ctx,
+            `tests.${node.id}: url \`${u}\` uses {{${m[1]}}} but \`${m[1]}\` is not in reads`,
+            node.line,
+          );
+        }
+      }
+    }
+  }
+
   // reads ⊆ ancestors' outputs
   for (const node of nodes) {
     const ancestors = ancestorsOf(node.id, depsOf);
@@ -521,6 +549,7 @@ export function validatePlan(
     env: envConfig,
     reset,
     tests: nodes,
+    gate: { route_patterns: routePatterns },
   };
   return { plan, issues: [] };
 }

@@ -90,7 +90,9 @@ Every node process receives `BASE_URL`, `ARTIFACTS_DIR`,
   `@playwright/test`, in spec files. A spec without a recorder heartbeat fails
   with "recorder silent".
 - The recorder counts only `event.isTrusted` interactions; synthetic
-  `dispatchEvent` never counts.
+  `dispatchEvent` never counts. One exception: `input`/`change` on a
+  `<select>` counts even when untrusted, because Playwright's `selectOption`
+  (the only way to pick an option) fires untrusted events.
 - The wrapper records `recorded.json`, `http.json`, `console.json`,
   `heartbeat.json` into `ARTIFACTS_DIR`.
 
@@ -103,6 +105,20 @@ Every node process receives `BASE_URL`, `ARTIFACTS_DIR`,
   login: specs/login-as-admin.spec.ts # optional; runs first, saves a session
   urls: ['/']
   sitemap: /sitemap.xml # optional, unioned with urls
+```
+
+Crawl URLs may use `{{key}}` placeholders, filled at run time from the
+merged `publish()` outputs of the node's ancestors. Every key must appear in
+the crawl node's `reads` (validated at parse time), which in turn must be an
+ancestor's `outputs`. Use this when the app's data is created by journeys
+rather than seeded with fixed IDs:
+
+```yaml
+- id: crawl-user
+  kind: crawl
+  depends_on: [world]
+  reads: [horse_code]
+  urls: ['/cheval/{{horse_code}}']
 ```
 
 The login snippet is an ordinary Playwright spec that navigates and saves the
@@ -124,6 +140,17 @@ test('save a session for the crawler', async ({ page }) => {
 - Identity key: `link:<href>` for `<a>`; `<tag>:<route>:<name|test-id|text>`
   otherwise. Repeated controls (500 "Delete" buttons) collapse to one.
 - `exclusions.yaml` lists exact identity keys the gate may ignore.
+- `gate.route_patterns` (top level of the plan) collapses dynamic routes and
+  internal link hrefs onto a pattern before keying, so a run-time ID never
+  mints a new key and a spec exercising `/cheval/222` covers the crawler's
+  `/cheval/111`. `:name` matches exactly one non-empty segment. Exclusion
+  keys use the pattern form (`button:/admin/users/:id:Retour`).
+
+  ```yaml
+  gate:
+    route_patterns: ['/admin/users/:id', '/admin/users/:id/edit', '/cheval/:code']
+  ```
+
 - The gate measures **exercised**, not "works" — assertions prove "works".
 
 ## Fault-injection rides

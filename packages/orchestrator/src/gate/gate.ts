@@ -1,5 +1,5 @@
 import type { ControlLike } from './identity.js';
-import { identityKey } from './identity.js';
+import { identityKey, normalizeControl } from './identity.js';
 
 export interface GateInput {
   /** Crawler-denominator controls (both passes unioned). */
@@ -8,6 +8,8 @@ export interface GateInput {
   recorded: ControlLike[];
   /** User-maintained exclusion list (exact identity keys). */
   exclusions: string[];
+  /** Route patterns collapsing dynamic routes into one identity (plan `gate.route_patterns`). */
+  routePatterns?: string[];
 }
 
 export interface GateReport {
@@ -21,12 +23,13 @@ export interface GateReport {
 }
 
 export function computeGate(input: GateInput): GateReport {
+  const patterns = input.routePatterns ?? [];
   const denominator = new Map<string, ControlLike>();
   for (const c of input.controls) {
-    const key = identityKey(c);
+    const key = identityKey(normalizeControl(c, patterns));
     if (!denominator.has(key)) denominator.set(key, c);
   }
-  const numerator = new Set(input.recorded.map((r) => identityKey(r)));
+  const numerator = new Set(input.recorded.map((r) => identityKey(normalizeControl(r, patterns))));
   const excluded = new Set(input.exclusions);
   const covered = [...denominator.keys()].filter((k) => numerator.has(k));
   const uncovered = [...denominator.keys()].filter((k) => !numerator.has(k) && !excluded.has(k));

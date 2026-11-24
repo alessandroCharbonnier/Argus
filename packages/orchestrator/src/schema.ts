@@ -82,6 +82,17 @@ const SCHEMA = {
         },
       },
     },
+    gate: {
+      type: 'object',
+      properties: {
+        route_patterns: {
+          type: 'array',
+          items: { type: 'string', pattern: '^/' },
+          description:
+            'Route patterns (`/admin/users/:id`) collapsing dynamic routes and internal link hrefs into one gate identity. Exclusion keys use the pattern form.',
+        },
+      },
+    },
     tests: {
       type: 'array',
       minItems: 1,
@@ -117,7 +128,8 @@ const SCHEMA = {
           urls: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Crawler routes (kind: crawl).',
+            description:
+              'Crawler routes (kind: crawl). `{{key}}` placeholders are filled from ancestor outputs at run time; every key must be listed in `reads`.',
           },
           sitemap: { type: 'string' },
           login: {

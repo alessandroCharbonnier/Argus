@@ -322,6 +322,27 @@ async function runTestNode(
   };
 }
 
+/**
+ * Fill `{{key}}` placeholders in crawl URLs from the merged publish.json of
+ * the node's ancestors (validation guarantees every key is in `reads`).
+ */
+export function resolveCrawlUrls(urls: string[], ancestors: Record<string, string>): string[] {
+  const values: Record<string, unknown> = {};
+  for (const file of Object.values(ancestors)) {
+    const pub = readJsonIfExists<Record<string, unknown>>(file);
+    if (pub) Object.assign(values, pub);
+  }
+  return urls.map((u) =>
+    u.replace(/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g, (_m, key: string) => {
+      const v = values[key];
+      if (v === undefined || v === null || v === '') {
+        throw new Error(`crawl url \`${u}\`: ancestor output \`${key}\` not published`);
+      }
+      return encodeURIComponent(String(v));
+    }),
+  );
+}
+
 async function runCrawlNode(
   opts: RunnerEnv,
   env: NodeJS.ProcessEnv,
@@ -353,9 +374,20 @@ async function runCrawlNode(
   const sessionPath = path.join(dir, 'session.json');
   const storageState = exists(sessionPath) ? readJsonIfExists<unknown>(sessionPath) : undefined;
   const httpLog: HttpEntry[] = [];
+  let urls: string[];
+  try {
+    urls = resolveCrawlUrls(node.urls, opts.ancestors);
+  } catch (err) {
+    return {
+      outcome: 'failed',
+      detail: (err as Error).message,
+      durationMs: Date.now() - started,
+      httpLog: [],
+    };
+  }
   const crawl = await crawlNode({
     baseUrl: plan.env.base_url,
-    urls: node.urls,
+    urls,
     sitemap: node.sitemap,
     storageState,
     httpLog,
